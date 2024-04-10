@@ -212,9 +212,9 @@ impl<T, U: Write> Dump<T, U> {
     /// Create a new `Dump` wrapping `upstream` logging activity to `dump`.
     pub fn new(upstream: T, dump: U) -> Dump<T, U> {
         Dump {
-            upstream: upstream,
+            upstream,
             inner: Some(Inner {
-                dump: dump,
+                dump,
                 now: Instant::now(),
             }),
         }
@@ -223,7 +223,7 @@ impl<T, U: Write> Dump<T, U> {
     /// Create a new `Dump` that passes packets through without logging.
     pub fn noop(upstream: T) -> Dump<T, U> {
         Dump {
-            upstream: upstream,
+            upstream,
             inner: None,
         }
     }
@@ -231,10 +231,10 @@ impl<T, U: Write> Dump<T, U> {
 
 impl<T: Read, U: Write> Read for Dump<T, U> {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
-        let n = try!(self.upstream.read(dst));
+        let n = self.upstream.read(dst)?;
 
         if let Some(inner) = self.inner.as_mut() {
-            try!(inner.write_packet(Direction::Read, &dst[0..n]));
+            inner.write_packet(Direction::Read, &dst[0..n])?;
         }
 
         Ok(n)
@@ -243,17 +243,17 @@ impl<T: Read, U: Write> Read for Dump<T, U> {
 
 impl<T: Write, U: Write> Write for Dump<T, U> {
     fn write(&mut self, src: &[u8]) -> io::Result<usize> {
-        let n = try!(self.upstream.write(src));
+        let n = self.upstream.write(src)?;
 
         if let Some(inner) = self.inner.as_mut() {
-            try!(inner.write_packet(Direction::Write, &src[0..n]));
+            inner.write_packet(Direction::Write, &src[0..n])?;
         }
 
         Ok(n)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        try!(self.upstream.flush());
+        self.upstream.flush()?;
         Ok(())
     }
 }
@@ -263,33 +263,27 @@ impl<T: Write, U: Write> Write for Dump<T, U> {
 impl<U: Write> Inner<U> {
     fn write_packet(&mut self, dir: Direction, data: &[u8]) -> io::Result<()> {
         if dir == Direction::Write {
-            try!(write!(self.dump, "<-  "));
+            write!(self.dump, "<-  ")?;
         } else {
-            try!(write!(self.dump, "->  "));
+            write!(self.dump, "->  ")?;
         }
 
         // Write elapsed time
-        let elapsed = millis((Instant::now() - self.now)) as f64 / 1000.0;
-        try!(write!(
-            self.dump,
-            "{:.*}s  {} bytes",
-            3,
-            elapsed,
-            data.len()
-        ));
+        let elapsed = millis(Instant::now() - self.now) as f64 / 1000.0;
+        write!(self.dump, "{:.*}s  {} bytes", 3, elapsed, data.len())?;
 
         // Write newline
-        try!(write!(self.dump, "\n"));
+        write!(self.dump, "\n")?;
 
         let mut pos = 0;
 
         while pos < data.len() {
             let end = cmp::min(pos + LINE, data.len());
-            try!(self.write_data_line(&data[pos..end]));
+            self.write_data_line(&data[pos..end])?;
             pos = end;
         }
 
-        try!(write!(self.dump, "\n"));
+        write!(self.dump, "\n")?;
 
         Ok(())
     }
@@ -298,25 +292,25 @@ impl<U: Write> Inner<U> {
         // First write binary
         for i in 0..LINE {
             if i >= line.len() {
-                try!(write!(self.dump, "   "));
+                write!(self.dump, "   ")?;
             } else {
-                try!(write!(self.dump, "{:02X} ", line[i]));
+                write!(self.dump, "{:02X} ", line[i])?;
             }
         }
 
         // Write some spacing for the ascii
-        try!(write!(self.dump, "    "));
+        write!(self.dump, "    ")?;
 
         for &byte in line.iter() {
             match byte {
-                0 => try!(write!(self.dump, "\\0")),
-                9 => try!(write!(self.dump, "\\t")),
-                10 => try!(write!(self.dump, "\\n")),
-                13 => try!(write!(self.dump, "\\r")),
-                32...126 => {
-                    try!(self.dump.write(&[b' ', byte]));
+                0 => write!(self.dump, "\\0")?,
+                9 => write!(self.dump, "\\t")?,
+                10 => write!(self.dump, "\\n")?,
+                13 => write!(self.dump, "\\r")?,
+                32..=126 => {
+                    self.dump.write(&[b' ', byte])?;
                 }
-                _ => try!(write!(self.dump, "\\?")),
+                _ => write!(self.dump, "\\?")?,
             }
         }
 
@@ -332,7 +326,7 @@ impl<U: Write> Inner<U> {
 
 /// Open a dump file at the specified location.
 pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Packets<File>> {
-    let dump = try!(File::open(path));
+    let dump = File::open(path)?;
     Ok(Packets::new(dump))
 }
 
@@ -398,7 +392,7 @@ impl<T: Read> Packets<T> {
                             direction: dir,
                             elapsed: Duration::from_millis((elapsed * 1000.0) as u64),
                         },
-                        data: data,
+                        data,
                     }));
                 }
 
