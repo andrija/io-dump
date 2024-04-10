@@ -117,6 +117,7 @@ extern crate tokio_io;
 use std::cmp;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Lines, Read, Write};
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -128,6 +129,38 @@ use std::time::{Duration, Instant};
 pub struct Dump<T, U> {
     upstream: T,
     inner: Option<Inner<U>>,
+}
+
+impl<T, U> AsRef<T> for Dump<T, U>
+where
+    <Dump<T, U> as Deref>::Target: AsRef<T>,
+{
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
+
+impl<T, U> AsMut<T> for Dump<T, U>
+where
+    <Dump<T, U> as Deref>::Target: AsMut<T>,
+{
+    fn as_mut(&mut self) -> &mut T {
+        self.deref_mut().as_mut()
+    }
+}
+
+impl<T, U> Deref for Dump<T, U> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.upstream
+    }
+}
+
+impl<T, U> DerefMut for Dump<T, U> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.upstream
+    }
 }
 
 #[derive(Debug)]
