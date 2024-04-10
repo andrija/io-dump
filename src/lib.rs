@@ -106,6 +106,7 @@
 //! [`TlsStream`]: https://docs.rs/tokio-tls/0.1/tokio_tls/struct.TlsStream.html
 
 #![deny(warnings, missing_docs, missing_debug_implementations)]
+#![allow(clippy::write_with_newline)]
 
 #[cfg(feature = "tokio")]
 extern crate futures;
@@ -308,7 +309,7 @@ impl<U: Write> Inner<U> {
                 10 => write!(self.dump, "\\n")?,
                 13 => write!(self.dump, "\\r")?,
                 32..=126 => {
-                    self.dump.write(&[b' ', byte])?;
+                    self.dump.write_all(&[b' ', byte])?;
                 }
                 _ => write!(self.dump, "\\?")?,
             }
@@ -352,7 +353,7 @@ impl<T: Read> Packets<T> {
                 .map(|v| v.into())
                 .collect();
 
-            if head.len() == 0 || head[0] == "//" {
+            if head.is_empty() || head[0] == "//" {
                 continue;
             }
 
