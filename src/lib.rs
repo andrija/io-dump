@@ -115,9 +115,9 @@ extern crate tokio_io;
 
 use std::cmp;
 use std::fs::File;
-use std::io::{self, Read, Write, BufRead, BufReader, Lines};
+use std::io::{self, BufRead, BufReader, Lines, Read, Write};
 use std::path::Path;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 /// Wraps an I/O handle, logging all activity in a readable format to a
 /// configurable destination.
@@ -197,8 +197,7 @@ impl<T> Dump<T, File> {
     ///
     /// If a file exists at `path`, it will be overwritten.
     pub fn to_file<P: AsRef<Path>>(upstream: T, path: P) -> io::Result<Self> {
-        File::create(path)
-            .map(move |dump| Dump::new(upstream, dump))
+        File::create(path).map(move |dump| Dump::new(upstream, dump))
     }
 }
 
@@ -271,7 +270,13 @@ impl<U: Write> Inner<U> {
 
         // Write elapsed time
         let elapsed = millis((Instant::now() - self.now)) as f64 / 1000.0;
-        try!(write!(self.dump, "{:.*}s  {} bytes", 3, elapsed, data.len()));
+        try!(write!(
+            self.dump,
+            "{:.*}s  {} bytes",
+            3,
+            elapsed,
+            data.len()
+        ));
 
         // Write newline
         try!(write!(self.dump, "\n"));
@@ -304,8 +309,8 @@ impl<U: Write> Inner<U> {
 
         for &byte in line.iter() {
             match byte {
-                 0 => try!(write!(self.dump, "\\0")),
-                 9 => try!(write!(self.dump, "\\t")),
+                0 => try!(write!(self.dump, "\\0")),
+                9 => try!(write!(self.dump, "\\t")),
                 10 => try!(write!(self.dump, "\\n")),
                 13 => try!(write!(self.dump, "\\r")),
                 32...126 => {
@@ -334,7 +339,9 @@ pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Packets<File>> {
 impl<T: Read> Packets<T> {
     /// Reads dump packets from the specified source.
     pub fn new(io: T) -> Packets<T> {
-        Packets { lines: BufReader::new(io).lines() }
+        Packets {
+            lines: BufReader::new(io).lines(),
+        }
     }
 
     fn read_packet(&mut self) -> io::Result<Option<Packet>> {
@@ -360,12 +367,17 @@ impl<T: Read> Packets<T> {
             let dir = match &head[0][..] {
                 "<-" => Direction::Write,
                 "->" => Direction::Read,
-                _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid direction format")),
+                _ => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "invalid direction format",
+                    ))
+                }
             };
 
             let elapsed: f64 = {
                 let s = &head[1];
-                s[..s.len()-1].parse().unwrap()
+                s[..s.len() - 1].parse().unwrap()
             };
 
             // Do nothing w/ bytes for now
@@ -393,7 +405,7 @@ impl<T: Read> Packets<T> {
                 let mut pos = 0;
 
                 loop {
-                    let c = &line[pos..pos+2];
+                    let c = &line[pos..pos + 2];
 
                     if c == "  " {
                         break;
@@ -401,7 +413,12 @@ impl<T: Read> Packets<T> {
 
                     let byte = match u8::from_str_radix(c, 16) {
                         Ok(byte) => byte,
-                        Err(_) => return Err(io::Error::new(io::ErrorKind::InvalidInput, "could not parse byte")),
+                        Err(_) => {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "could not parse byte",
+                            ))
+                        }
                     };
 
                     data.push(byte);
@@ -432,7 +449,10 @@ const MILLIS_PER_SEC: u64 = 1_000;
 fn millis(duration: Duration) -> u64 {
     // Round up.
     let millis = (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
-    duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
+    duration
+        .as_secs()
+        .saturating_mul(MILLIS_PER_SEC)
+        .saturating_add(millis as u64)
 }
 
 #[cfg(feature = "tokio")]
