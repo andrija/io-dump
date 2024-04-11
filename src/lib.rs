@@ -108,12 +108,6 @@
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 #![allow(clippy::write_with_newline)]
 
-#[cfg(feature = "tokio")]
-extern crate futures;
-
-#[cfg(feature = "tokio")]
-extern crate tokio_io;
-
 use std::cmp;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Lines, Read, Write};
@@ -481,22 +475,4 @@ fn millis(duration: Duration) -> u64 {
         .as_secs()
         .saturating_mul(MILLIS_PER_SEC)
         .saturating_add(millis as u64)
-}
-
-#[cfg(feature = "tokio")]
-mod tokio {
-    use super::Dump;
-
-    use futures::Poll;
-    use tokio_io::{AsyncRead, AsyncWrite};
-
-    use std::io::{self, Write};
-
-    impl<T: AsyncRead, U: Write> AsyncRead for Dump<T, U> {}
-
-    impl<T: AsyncWrite, U: Write> AsyncWrite for Dump<T, U> {
-        fn shutdown(&mut self) -> Poll<(), io::Error> {
-            self.upstream.shutdown()
-        }
-    }
 }
