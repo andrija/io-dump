@@ -288,61 +288,72 @@ impl<T: Write, U: Write> Write for Dump<T, U> {
 
 // ===== impl Inner =====
 
-impl<U: Write> Inner<U> {
-    fn write_packet(&mut self, dir: Direction, data: &[u8]) -> io::Result<()> {
-        if dir == Direction::Write {
-            write!(self.dump, "<-  ")?;
-        } else {
-            write!(self.dump, "->  ")?;
-        }
-
-        // Write elapsed time
-        let elapsed = millis(Instant::now() - self.now) as f64 / 1000.0;
-        write!(self.dump, "{:.*}s  {} bytes", 3, elapsed, data.len())?;
-
-        // Write newline
-        write!(self.dump, "\n")?;
-
-        let mut pos = 0;
-
-        while pos < data.len() {
-            let end = cmp::min(pos + LINE, data.len());
-            self.write_data_line(&data[pos..end])?;
-            pos = end;
-        }
-
-        write!(self.dump, "\n")?;
-
-        Ok(())
+/// Write data in a packet format
+pub fn write_packet(
+    mut dump: impl Write,
+    dir: Direction,
+    data: &[u8],
+    elapsed: Duration,
+) -> io::Result<()> {
+    if dir == Direction::Write {
+        write!(dump, "<-   ")?;
+    } else {
+        write!(dump, "->   ")?;
     }
 
-    fn write_data_line(&mut self, line: &[u8]) -> io::Result<()> {
-        // First write binary
-        for i in 0..LINE {
-            if i >= line.len() {
-                write!(self.dump, "   ")?;
-            } else {
-                write!(self.dump, "{:02X} ", line[i])?;
-            }
+    // Write elapsed time
+    let elapsed = millis(elapsed) as f64 / 1000.0;
+    write!(dump, "{:.*}s   {} bytes", 3, elapsed, data.len())?;
+
+    // Write newline
+    write!(dump, "\n")?;
+
+    let mut pos = 0;
+
+    while pos < data.len() {
+        let end = cmp::min(pos + LINE, data.len());
+        write_data_line(&mut dump, &data[pos..end])?;
+        pos = end;
+    }
+
+    write!(dump, "\n")?;
+
+    Ok(())
+}
+
+fn write_data_line(mut dump: impl Write, line: &[u8]) -> io::Result<()> {
+    // First write binary
+    for i in 0..LINE {
+        if i >= line.len() {
+            write!(dump, "   ")?;
+        } else {
+            write!(dump, "{:02X} ", line[i])?;
         }
+    }
 
-        // Write some spacing for the ascii
-        write!(self.dump, "    ")?;
+    // Write some spacing for the ascii
+    write!(dump, "   ")?;
 
-        for &byte in line.iter() {
-            match byte {
-                0 => write!(self.dump, "\\0")?,
-                9 => write!(self.dump, "\\t")?,
-                10 => write!(self.dump, "\\n")?,
-                13 => write!(self.dump, "\\r")?,
-                32..=126 => {
-                    self.dump.write_all(&[b' ', byte])?;
-                }
-                _ => write!(self.dump, "\\?")?,
+    for &byte in line.iter() {
+        match byte {
+            0 => write!(dump, "\\0")?,
+            9 => write!(dump, "\\t")?,
+            10 => write!(dump, "\\n")?,
+            13 => write!(dump, "\\r")?,
+            32..=126 => {
+                dump.write_all(&[b' ', byte])?;
             }
+            _ => write!(dump, "\\?")?,
         }
+    }
 
-        write!(self.dump, "\n")
+    write!(dump, "\n")
+}
+
+impl<U: Write> Inner<U> {
+    fn write_packet(&mut self, dir: Direction, data: &[u8]) -> io::Result<()> {
+        let elapsed = Instant::now() - self.now;
+        write_packet(&mut self.dump, dir, data, elapsed)
     }
 }
 
