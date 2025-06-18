@@ -130,7 +130,7 @@ where
     <Dump<T, U> as Deref>::Target: AsRef<T>,
 {
     fn as_ref(&self) -> &T {
-        self.deref().as_ref()
+        self.deref()
     }
 }
 
@@ -139,7 +139,7 @@ where
     <Dump<T, U> as Deref>::Target: AsMut<T>,
 {
     fn as_mut(&mut self) -> &mut T {
-        self.deref_mut().as_mut()
+        self.deref_mut()
     }
 }
 
@@ -386,7 +386,7 @@ impl<T: Read> Packets<T> {
             };
 
             let head: Vec<String> = head
-                .split(|v| v == ' ')
+                .split(' ')
                 .filter(|v| !v.is_empty())
                 .map(|v| v.into())
                 .collect();
@@ -481,7 +481,7 @@ const MILLIS_PER_SEC: u64 = 1_000;
 /// million years.
 fn millis(duration: Duration) -> u64 {
     // Round up.
-    let millis = (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
+    let millis = duration.subsec_nanos().div_ceil(NANOS_PER_MILLI);
     duration
         .as_secs()
         .saturating_mul(MILLIS_PER_SEC)

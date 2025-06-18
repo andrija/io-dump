@@ -10,7 +10,7 @@ fn main() -> std::io::Result<()> {
     let mut shift_time: Option<Duration> = None;
 
     for packet in packets {
-        if shift_time == None {
+        if shift_time.is_none() {
             shift_time = Some(packet.elapsed());
         }
 
